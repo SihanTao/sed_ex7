@@ -9,8 +9,7 @@ import java.util.*;
 public class CachedForecaster extends Forecaster {
 
   private final Forecaster forecaster;
-  private final Map<PlaceAndDayToForeCast, Forecast> cache =
-      new LinkedHashMap<>();
+  private final Map<PlaceAndDayToForeCast, ForecastWithCreationTime> cache = new LinkedHashMap<>();
   private final Queue<PlaceAndDayToForeCast> queue = new LinkedList<>();
   private static final int MAX_SIZE = 5;
 
@@ -29,9 +28,17 @@ public class CachedForecaster extends Forecaster {
   public Forecast forecastFor(Region region, Day day) {
     PlaceAndDayToForeCast placeAndDayToForeCast = new PlaceAndDayToForeCast(region, day);
 
-    Forecast forecast = cache.get(placeAndDayToForeCast);
-    if (forecast != null) {
-      return forecast;
+    ForecastWithCreationTime forecastWithCreationTime = cache.get(placeAndDayToForeCast);
+    if (forecastWithCreationTime != null) {
+      if (!forecastWithCreationTime.isExpired()) {
+        return forecastWithCreationTime.getForecast();
+      } else {
+        Forecast newForecast = forecaster.forecastFor(region, day);
+        ForecastWithCreationTime forecastWithCreationTime1 =
+            new ForecastWithCreationTime(newForecast);
+        cache.put(placeAndDayToForeCast, forecastWithCreationTime1);
+        return newForecast;
+      }
     } else {
       return addForecastAndReturn(region, day, placeAndDayToForeCast);
     }
@@ -46,7 +53,7 @@ public class CachedForecaster extends Forecaster {
       queue.poll();
       cache.remove(placeAndDayToForeCast);
     }
-    cache.put(placeAndDayToForeCast, forecast);
+    cache.put(placeAndDayToForeCast, new ForecastWithCreationTime(forecast));
     return forecast;
   }
 }
